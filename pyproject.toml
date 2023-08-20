@@ -1,0 +1,15 @@
+[project]
+name = "qbot"
+version = "0.1.0"
+description = "qbot"
+readme = "README.md"
+requires-python = ">=3.8, <4.0"
+
+[tool.nonebot]
+adapters = [{ name = "QQ 频道", module_name = "nonebot.adapters.qqguild" }]
+plugins = [
+    "nonebot_plugin_treehelp",
+    "nonebot_plugin_apscheduler",
+]
+plugin_dirs = ["src/plugins"]
+builtin_plugins = []
