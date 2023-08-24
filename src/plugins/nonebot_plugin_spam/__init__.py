@@ -10,7 +10,6 @@ from nonebot.log import logger
 from .config import Config
 from .db import TableModel
 from .common import error_singal, get_classifer_result
-from .qq_guild import QQGulidApi
 from sqlalchemy import null, case, and_, select
 
 __plugin_meta__ = PluginMetadata(

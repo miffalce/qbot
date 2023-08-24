@@ -13,3 +13,4 @@ class Config(BaseModel, extra=Extra.ignore):
 
     pg_conn: str = ""
     qguild_bots: List[BotInfo] = Field(default_factory=list)
+    bert_url: str = ""

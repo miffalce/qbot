@@ -144,9 +144,6 @@ dmypy.json
 # .info
 .env
 
-# test
-test/
-
 # git
 .git
 
