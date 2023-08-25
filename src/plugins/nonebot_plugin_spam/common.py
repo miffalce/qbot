@@ -17,10 +17,10 @@ def error_singal(timeout=10, ignore_err=True):
 
     def decorator(func):
         @functools.wraps(func)
-        def wrapper(*args, **kw: Event):
+        async def wrapper(*args, **kw: Event):
             try:
                 signal.alarm(timeout)
-                rt = func(*args, **kw)
+                rt = await func(*args, **kw)
                 signal.alarm(0)
                 return rt
             except Exception as err:

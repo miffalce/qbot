@@ -49,6 +49,11 @@ class TestTableStmt:
     def test_create_user(func):
         db.QQGulidStmt().create("user_tb", T.model.metadata, T.model.engine)
 
+    def test_create_user(func):
+        db.QQGulidStmt().create("user_tb", T.model.metadata, T.model.engine).insert(
+            box.Box(T.record)
+        ).execute(T.model.session)
+
     def test_create_message_table(func):
         db.QQGulidStmt().create(
             f"message_tb_{box.Box(T.record).guild_id}",
@@ -60,14 +65,41 @@ class TestTableStmt:
         for mess in T.model.metadata.tables:
             if mess.startswith("user"):
                 meta = T.model.metadata.tables[mess]
-                stmt = db.QQGulidStmt(meta).insert(box.Box(T.record)).stmt
-                T.model.session.execute(stmt)
-                T.model.session.commit()
+                db.QQGulidStmt(meta).insert(box.Box(T.record)).execute(T.model.session)
 
     def test_insert_message(func):
         for mess in T.model.metadata.tables:
             if mess.startswith("message"):
                 meta = T.model.metadata.tables[mess]
-                stmt = db.QQGulidStmt(meta).insert(box.Box(T.record)).stmt
-                T.model.session.execute(stmt)
-                T.model.session.commit()
+                db.QQGulidStmt(meta).insert(box.Box(T.record)).execute(T.model.session)
+
+    def test_select_where_message(func):
+        for mess in T.model.metadata.tables:
+            if mess.startswith("message"):
+                meta = T.model.metadata.tables[mess]
+                dq = db.QQGulidStmt(meta).select("content", "spam").where("spam", None)
+                assert dq.execute(T.model.session).fetchall()[-1] == (
+                    "asdgklasdgklsadg",
+                    None,
+                )
+
+    def test_update_case_message(func):
+        for mess in T.model.metadata.tables:
+            if mess.startswith("message"):
+                meta = T.model.metadata.tables[mess]
+                dq = db.QQGulidStmt(meta).update_case(
+                    "spam",
+                    "mid",
+                    [
+                        [">=", 4, 0.3],
+                        ["<", 6, 0.2],
+                    ],
+                )
+                dq.execute(T.model.session)
+                ans = (
+                    db.QQGulidStmt(meta)
+                    .select("id", "spam")
+                    .execute(T.model.session)
+                    .fetchall()
+                )
+                print(ans)

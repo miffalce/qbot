@@ -78,6 +78,17 @@ class MeteTypeDef(object):
         return vars(self)
 
 
+class DBResultParser(object):
+    def __init__(self, result) -> None:
+        self.result = result
+
+    def fetchall(self):
+        return self.result.fetchall()
+
+    def fetchone(self):
+        return self.result.fetchone()
+
+
 class TableModel(object):
     def __init__(self, pg_conn):
         self.pg_conn = pg_conn
@@ -117,9 +128,9 @@ class TableStmt(object):
                 ][0]
                 table_meta = Table(tb_name, shema_meta, *data_type)
                 table_meta.create(engine)
-                self.table_meta = shema_meta.tables[tb_name]
-                self.stmt = self.table_meta
-                return self
+            self.table_meta = shema_meta.tables[tb_name]
+            self.stmt = self.table_meta
+            return self
         except Exception as err:
             print(f"[ ERROR ] {err}")
             if tb_name in shema_meta.tables.keys():
@@ -197,6 +208,35 @@ class TableStmt(object):
             self.stmt = select(*cols)
         self.stmt = self.stmt.select()
         return self
+
+    def where(self, col, value, op="="):
+        if self.exist_stmt:
+            bool_ = Operators.cmp_operators[op](getattr(self.table_meta.c, col), value)
+            self.stmt = self.stmt.where(bool_)
+        return self
+
+    def limit(self, value):
+        self.stmt = self.stmt.limit(value)
+        return self
+
+    def execute(self, session):
+        """
+        Execute the statement.
+
+            Args:
+                session: The database session.
+
+            Returns:
+                The `TableStmt` instance.
+        """
+        if self.exist_stmt:
+            ans = session.execute(self.stmt)
+            session.commit()
+        return DBResultParser(ans)
+
+    @property
+    def exist_stmt(self):
+        return str(self.stmt) != "None" or not str(self.stmt)
 
     @property
     def names(self):
