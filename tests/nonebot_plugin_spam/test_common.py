@@ -27,8 +27,7 @@ class TestTableStmt:
     def test_cacl(self):
         sq = q.ScoreRequest(T.text)
         sq.encode = T.result
-        sq.cacluate()
-        assert sq.result == {
+        assert sq.dicts == {
             "有啥要qq号码嘛？": 0.9937738530780085,
             "出售qq,13": -0.57104671899086,
         }

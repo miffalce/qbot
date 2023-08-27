@@ -20,6 +20,7 @@ from sqlalchemy import (
     create_engine,
     inspect,
     not_,
+    or_,
     null,
     select,
     Subquery,
@@ -81,23 +82,28 @@ class MeteTypeDef(object):
 
 
 class DBResultParser(object):
-    def __init__(self, result, qq_guild) -> None:
-        self.result = result
+    def __init__(self, raw, qq_guild) -> None:
+        self.raw = raw
+        self.ans = []
         self.qq_guild = qq_guild
 
-    def fetchall(self, filter_=None):
-        if filter_ is None:
-            filter_ = self.qq_guild.no_filter_names
-        ans = self.result.fetchall()
-        idx_ = [self.qq_guild.no_filter_names.index(i) for i in filter_]
-        if len(idx_) == 1:
-            ans = [rol[idx_[0]] for rol in ans]
-        else:
-            ans = [[rol[i] for i in idx_] for rol in ans]
-        return ans
+    def fetchall(self):
+        self.ans = self.raw.fetchall()
+        return self
 
     def fetchone(self):
-        return self.result.fetchone()
+        self.ans = self.raw.fetchone()
+        return self
+
+    def filter_by(self, filter_=None):
+        if filter_ is None:
+            filter_ = self.qq_guild.no_filter_names
+        idx_ = [self.qq_guild.no_filter_names.index(i) for i in filter_]
+        if len(idx_) == 1:
+            ans = [rol[idx_[0]] for rol in self.ans]
+        else:
+            ans = [[rol[i] for i in idx_] for rol in self.ans]
+        return ans
 
 
 class TableModel(object):
@@ -227,11 +233,27 @@ class TableStmt(object):
     def where(self, col, value, op="="):
         if self.exist_stmt:
             bool_ = Operators.cmp_operators[op](getattr(self.table_meta.c, col), value)
+            if value is not None and Operators.cmp_operators[op] == operator.ne:
+                bool_ = or_(bool_, getattr(self.table_meta.c, col) == None)
             self.stmt = self.stmt.where(bool_)
         return self
 
     def limit(self, num: int):
         self.stmt = self.stmt.limit(num)
+        return self
+
+    def subquery(self, *col):
+        col = [getattr(self.table_meta.c, c) for c in col]
+        self.stmt = select(*col)
+        return self
+
+    def where_in_(self, col, stmt):
+        col = getattr(self.table_meta.c, col)
+        self.stmt = self.stmt.where(col.in_(stmt))
+        return self
+
+    def in_(self, stmt: int):
+        self.stmt = self.stmt._in(stmt)
         return self
 
     def execute(self, session):

@@ -46,35 +46,50 @@ async def update_score() -> None:
             QQGulidStmt(table_meta).delete().where("content", None).execute(T.session)
             data = (
                 QQGulidStmt(table_meta)
-                .select("content", "spam")
+                .select()
                 .where("spam", None)
                 .limit(5)
                 .execute(T.session)
                 .fetchall()
+                .filter_by(["content"])
             )
-            data = [i[0] for i in data if i[0]]
             print(data)
             if data:
                 sr = ScoreRequest(data)
                 sr.init_request(guild_config.bert_url)
-                sr.cacluate()
                 dq = QQGulidStmt(table_meta).update_case("spam", "content", sr.list)
                 dq.execute(T.session)
 
 
-@scheduler.scheduled_job("cron", second="*/5", id="event_message")
+@scheduler.scheduled_job("cron", second="*/1", id="event_message")
 async def recall_message() -> None:
     bot = nonebot.get_bot()
-    pass
-    # guild = QQGulidApi(bot.bot_info.id, bot.bot_info.token)
-    # user_meta = t_mod.metadata.tables["user_tb"]
-    # u_stmt = select(user_meta.c.author_id).where(user_meta.c.member_roles == [5, 14])
-    # for t_name, t_meta in t_mod.metadata.tables.items():
-    #     if t_name.startswith("message_tb"):
-    #         stmt = select(t_meta.c.channel_id, t_meta.c.id).where(
-    #             t_meta.c.author_id.in_(u_stmt)
-    #         )
-    #         datas = t_mod.session.execute(stmt).fetchall()
-    #         logger.debug(datas)
-    #         for i in datas:
-    #             await bot.delete_message(channel_id=i[0], message_id=i[1])
+    user_meta = T.metadata.tables["user_tb"]
+    for name, table_meta in T.metadata.tables.items():
+        if name.startswith("message_tb"):
+            sub_query_stmt = (
+                QQGulidStmt(user_meta)
+                .subquery("author_id")
+                .where("member_roles", [4, 19], op="!=")
+                .stmt
+            )
+            data = (
+                QQGulidStmt(table_meta)
+                .select()
+                .where_in_("author_id", sub_query_stmt)
+                .where("color", 1, "!=")
+                .where("spam", 0, "<")
+                .execute(T.session)
+                .fetchall()
+                .filter_by(["channel_id", "id"])
+            )
+            print(data)
+            for ent in data:
+                try:
+                    await bot.delete_message(channel_id=ent[0], message_id=ent[1])
+                except Exception as err:
+                    print(f"ERROR: {err}")
+                finally:
+                    QQGulidStmt(table_meta).update_case(color=1).where(
+                        "id", ent[1]
+                    ).execute(T.session)

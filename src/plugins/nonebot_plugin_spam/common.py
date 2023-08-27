@@ -37,7 +37,6 @@ class ScoreRequest(object):
     def __init__(self, text: list) -> None:
         self.text = text
         self.encode = {}
-        self.result = {}
 
     def init_request(self, url):
         data = {"data": {"text": self.text}}
@@ -45,16 +44,15 @@ class ScoreRequest(object):
         ans = requests.post(url=url, headers=headers, data=json.dumps(data))
         self.encode = json.loads(ans.text)
 
-    def cacluate(self):
+    @property
+    def dicts(self):
+        result = {}
         for block in self.encode["result"]:
             score = block["predictions"][0]["score"] * (
                 1 if block["predictions"][0]["label"] == "normal" else -1
             )
-            self.result[block["text"]] = score
-
-    @property
-    def dicts(self):
-        return self.result
+            result[block["text"]] = score
+        return result
 
     @property
     def list(self):

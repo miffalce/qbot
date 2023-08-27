@@ -78,7 +78,7 @@ class TestTableStmt:
             if mess.startswith("message"):
                 meta = T.model.metadata.tables[mess]
                 dq = db.QQGulidStmt(meta).select().where("spam", None)
-                dq.execute(T.model.session).fetchall(["content"])
+                dq.execute(T.model.session).fetchall().filter_by(["content"])
 
     def test_update_case_message_3(func):
         for mess in T.model.metadata.tables:
@@ -93,5 +93,41 @@ class TestTableStmt:
                     ],
                 )
                 dq.execute(T.model.session)
-                ans = db.QQGulidStmt(meta).select().execute(T.model.session).fetchall()
+                ans = (
+                    db.QQGulidStmt(meta)
+                    .select()
+                    .execute(T.model.session)
+                    .fetchall()
+                    .filter_by()
+                )
                 assert ans[-1][-2]
+
+    def test_sub_query(self):
+        user_meta = T.model.metadata.tables["user_tb"]
+        for mess in T.model.metadata.tables:
+            if mess.startswith("user"):
+                continue
+            meta = T.model.metadata.tables[mess]
+            sub_query_stmt = (
+                db.QQGulidStmt(user_meta)
+                .subquery("author_id")
+                .where("member_roles", [4, 19], op="==")
+                .stmt
+            )
+            data = (
+                db.QQGulidStmt(meta)
+                .select()
+                .where_in_("author_id", sub_query_stmt)
+                .where("color", 1, "!=")
+                .execute(T.model.session)
+                .fetchall()
+                .filter_by(["channel_id", "id", "color"])
+            )
+            print(data)
+
+    def test_clean_db(self):
+        for mess in T.model.metadata.tables:
+            meta = T.model.metadata.tables[mess]
+            db.QQGulidStmt(meta).delete().where("channel_id", "111111111").execute(
+                T.model.session
+            )
