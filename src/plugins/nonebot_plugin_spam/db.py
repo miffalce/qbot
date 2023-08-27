@@ -22,6 +22,8 @@ from sqlalchemy import (
     not_,
     null,
     select,
+    Subquery,
+    delete,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -79,11 +81,20 @@ class MeteTypeDef(object):
 
 
 class DBResultParser(object):
-    def __init__(self, result) -> None:
+    def __init__(self, result, qq_guild) -> None:
         self.result = result
+        self.qq_guild = qq_guild
 
-    def fetchall(self):
-        return self.result.fetchall()
+    def fetchall(self, filter_=None):
+        if filter_ is None:
+            filter_ = self.qq_guild.no_filter_names
+        ans = self.result.fetchall()
+        idx_ = [self.qq_guild.no_filter_names.index(i) for i in filter_]
+        if len(idx_) == 1:
+            ans = [rol[idx_[0]] for rol in ans]
+        else:
+            ans = [[rol[i] for i in idx_] for rol in ans]
+        return ans
 
     def fetchone(self):
         return self.result.fetchone()
@@ -136,6 +147,10 @@ class TableStmt(object):
             if tb_name in shema_meta.tables.keys():
                 self.table_meta.tables.pop(tb_name)
 
+    def delete(self):
+        self.stmt = self.table_meta.delete()
+        return self
+
     def insert(self, **kwargs):
         """
         Create an insert statement.
@@ -167,13 +182,16 @@ class TableStmt(object):
             The case expression.
         """
         conds = []
-        for op, r_, v in case_items:
+        for stmt_ in case_items:
+            op = stmt_[0]
+            if op not in Operators.cmp_operators:
+                op = "="
             conds.append(
                 (
                     Operators.cmp_operators[op](
-                        getattr(self.table_meta.c, judge_col), r_
+                        getattr(self.table_meta.c, judge_col), stmt_[-2]
                     ),
-                    v,
+                    stmt_[-1],
                 )
             )
 
@@ -202,10 +220,7 @@ class TableStmt(object):
         )
         return self
 
-    def select(self, *cols):
-        if cols:
-            cols = [operator.attrgetter(f"c.{col}")(self.table_meta) for col in cols]
-            self.stmt = select(*cols)
+    def select(self):
         self.stmt = self.stmt.select()
         return self
 
@@ -215,8 +230,8 @@ class TableStmt(object):
             self.stmt = self.stmt.where(bool_)
         return self
 
-    def limit(self, value):
-        self.stmt = self.stmt.limit(value)
+    def limit(self, num: int):
+        self.stmt = self.stmt.limit(num)
         return self
 
     def execute(self, session):
@@ -232,7 +247,7 @@ class TableStmt(object):
         if self.exist_stmt:
             ans = session.execute(self.stmt)
             session.commit()
-        return DBResultParser(ans)
+        return DBResultParser(ans, self)
 
     @property
     def exist_stmt(self):
@@ -245,6 +260,10 @@ class TableStmt(object):
             for col in self.table_meta.columns
             if col.name not in self.ignore_col
         ]
+
+    @property
+    def no_filter_names(self):
+        return [col.name for col in self.table_meta.columns]
 
     @property
     def types(self):

@@ -3,7 +3,7 @@ from nonebot.internal.adapter import Event as Event
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
 
-from .common import error_singal
+from .common import error_singal, ScoreRequest
 from .config import Config
 from .db import QQGulidStmt, TableModel
 
@@ -43,7 +43,23 @@ async def store_handler(event: Event) -> None:
 async def update_score() -> None:
     for name, table_meta in T.metadata.tables.items():
         if name.startswith("message_tb"):
-            stmt = QQGulidStmt(table_meta).select("text")
+            QQGulidStmt(table_meta).delete().where("content", None).execute(T.session)
+            data = (
+                QQGulidStmt(table_meta)
+                .select("content", "spam")
+                .where("spam", None)
+                .limit(5)
+                .execute(T.session)
+                .fetchall()
+            )
+            data = [i[0] for i in data if i[0]]
+            print(data)
+            if data:
+                sr = ScoreRequest(data)
+                sr.init_request(guild_config.bert_url)
+                sr.cacluate()
+                dq = QQGulidStmt(table_meta).update_case("spam", "content", sr.list)
+                dq.execute(T.session)
 
 
 @scheduler.scheduled_job("cron", second="*/5", id="event_message")

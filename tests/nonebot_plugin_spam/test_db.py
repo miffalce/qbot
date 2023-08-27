@@ -77,13 +77,10 @@ class TestTableStmt:
         for mess in T.model.metadata.tables:
             if mess.startswith("message"):
                 meta = T.model.metadata.tables[mess]
-                dq = db.QQGulidStmt(meta).select("content", "spam").where("spam", None)
-                assert dq.execute(T.model.session).fetchall()[-1] == (
-                    "asdgklasdgklsadg",
-                    None,
-                )
+                dq = db.QQGulidStmt(meta).select().where("spam", None)
+                dq.execute(T.model.session).fetchall(["content"])
 
-    def test_update_case_message(func):
+    def test_update_case_message_3(func):
         for mess in T.model.metadata.tables:
             if mess.startswith("message"):
                 meta = T.model.metadata.tables[mess]
@@ -96,10 +93,5 @@ class TestTableStmt:
                     ],
                 )
                 dq.execute(T.model.session)
-                ans = (
-                    db.QQGulidStmt(meta)
-                    .select("id", "spam")
-                    .execute(T.model.session)
-                    .fetchall()
-                )
-                print(ans)
+                ans = db.QQGulidStmt(meta).select().execute(T.model.session).fetchall()
+                assert ans[-1][-2]

@@ -51,3 +51,11 @@ class ScoreRequest(object):
                 1 if block["predictions"][0]["label"] == "normal" else -1
             )
             self.result[block["text"]] = score
+
+    @property
+    def dicts(self):
+        return self.result
+
+    @property
+    def list(self):
+        return [[k, v] for k, v in self.dicts.items()]
