@@ -153,6 +153,10 @@ class TableStmt(object):
             if tb_name in shema_meta.tables.keys():
                 self.table_meta.tables.pop(tb_name)
 
+    def drop(self, bind):
+        self.stmt = self.stmt.drop(bind)
+        return self
+
     def delete(self):
         self.stmt = self.table_meta.delete()
         return self
@@ -269,7 +273,8 @@ class TableStmt(object):
         if self.exist_stmt:
             ans = session.execute(self.stmt)
             session.commit()
-        return DBResultParser(ans, self)
+            return DBResultParser(ans, self)
+        return []
 
     @property
     def exist_stmt(self):
