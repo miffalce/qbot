@@ -3,9 +3,9 @@ from nonebot.internal.adapter import Event as Event
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
 
-from .common import error_singal, ScoreRequest
+from .spam_common import error_singal, ScoreRequest
 from .config import Config
-from .db import QQGulidStmt, TableModel
+from .spam_db import QQGulidStmt, TableModel
 
 __plugin_meta__ = PluginMetadata(
     name="guild_spam",
@@ -61,7 +61,7 @@ async def update_score() -> None:
                 dq.execute(T.session)
 
 
-@scheduler.scheduled_job("cron", second="*/1", id="event_message")
+@scheduler.scheduled_job("cron", second="*/1", id="recall_message")
 async def recall_message() -> None:
     bot = nonebot.get_bot()
     user_meta = T.metadata.tables["user_tb"]

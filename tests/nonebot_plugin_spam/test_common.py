@@ -1,4 +1,4 @@
-import common as q
+import spam_common as q
 import os
 
 

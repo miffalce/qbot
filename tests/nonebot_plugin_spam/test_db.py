@@ -2,7 +2,7 @@ import datetime
 
 import box
 import os
-import db as db
+import spam_db as spam_db
 
 
 class T:
@@ -41,27 +41,27 @@ class T:
         "reply": None,
         "_message": [{"type": "text", "data": {"text": "asdgklasdgklsadg"}}],
     }
-    model = db.TableModel(os.getenv("pg_conn", ""))
+    model = spam_db.TableModel(os.getenv("pg_conn", ""))
     model.init_engine()
 
 
 class TestTableStmt:
     def test_create_table(func):
-        db.QQGulidStmt().create(
+        spam_db.QQGulidStmt().create(
             "user_tb_test", T.model.metadata, T.model.engine
         ).insert(box.Box(T.record)).execute(T.model.session)
-        db.QQGulidStmt().create(
+        spam_db.QQGulidStmt().create(
             f"message_tb_test", T.model.metadata, T.model.engine
         ).insert(box.Box(T.record)).execute(T.model.session)
 
     def test_select_where_message(func):
         meta = T.model.metadata.tables["message_tb_test"]
-        dq = db.QQGulidStmt(meta).select().where("spam", None)
+        dq = spam_db.QQGulidStmt(meta).select().where("spam", None)
         dq.execute(T.model.session).fetchall().filter_by(["content"])
 
     def test_update_case_message_3_para(func):
         meta = T.model.metadata.tables["message_tb_test"]
-        dq = db.QQGulidStmt(meta).update_case(
+        dq = spam_db.QQGulidStmt(meta).update_case(
             "spam",
             "mid",
             [
@@ -71,7 +71,7 @@ class TestTableStmt:
         )
         dq.execute(T.model.session)
         ans = (
-            db.QQGulidStmt(meta)
+            spam_db.QQGulidStmt(meta)
             .select()
             .execute(T.model.session)
             .fetchall()
@@ -83,13 +83,13 @@ class TestTableStmt:
         user_meta = T.model.metadata.tables["user_tb_test"]
         meta = T.model.metadata.tables["message_tb_test"]
         sub_query_stmt = (
-            db.QQGulidStmt(user_meta)
+            spam_db.QQGulidStmt(user_meta)
             .subquery("author_id")
             .where("member_roles", [4, 18], op="==")
             .stmt
         )
         data = (
-            db.QQGulidStmt(meta)
+            spam_db.QQGulidStmt(meta)
             .select()
             .where_in_("author_id", sub_query_stmt)
             .where("color", 1, "!=")
@@ -103,6 +103,6 @@ class TestTableStmt:
 
     def test_clean_db(self):
         meta = T.model.metadata.tables["user_tb_test"]
-        db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
+        spam_db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
         meta = T.model.metadata.tables["message_tb_test"]
-        db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
+        spam_db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
