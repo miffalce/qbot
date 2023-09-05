@@ -6,28 +6,25 @@ import operator
 from sqlalchemy import (
     ARRAY,
     FLOAT,
-    INTEGER,
     TIMESTAMP,
-    VARCHAR,
     Boolean,
     Column,
     Integer,
     MetaData,
     String,
     Table,
-    and_,
     case,
     create_engine,
-    inspect,
-    not_,
     or_,
-    null,
+    and_,
     select,
-    Subquery,
-    delete,
+    insert,
+    UniqueConstraint,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+
+from sqlalchemy.dialects.postgresql import insert
 
 
 class Operators(object):
@@ -46,6 +43,7 @@ class Operators(object):
         "!=": operator.ne,
         "<>": operator.ne,
         "ne": operator.ne,
+        "in": lambda x, y: x.in_(y),
     }
 
 
@@ -64,6 +62,7 @@ class MeteTypeDef(object):
             Column("member_joined_at", TIMESTAMP),
             Column("spam", FLOAT),
             Column("color", Integer),
+            UniqueConstraint("author_id", "channel_id", "guild_id"),
         ]
         self.message_tb: list = [
             Column("mid", Integer, primary_key=True),
@@ -74,6 +73,7 @@ class MeteTypeDef(object):
             Column("timestamp", TIMESTAMP),
             Column("spam", FLOAT),
             Column("color", Integer),
+            UniqueConstraint("id", "channel_id"),
         ]
 
     @property
@@ -145,7 +145,7 @@ class TableStmt(object):
                 ][0]
                 table_meta = Table(tb_name, shema_meta, *data_type)
                 table_meta.create(engine)
-            self.table_meta = shema_meta.tables[tb_name]
+            self.table_meta: MetaData = shema_meta.tables[tb_name]
             self.stmt = self.table_meta
             return self
         except Exception as err:
@@ -176,7 +176,12 @@ class TableStmt(object):
             for k, v in kwargs.items()
             if k in self.names and v != "NULL"
         }
-        self.stmt = self.table_meta.insert().values(**kwargs)
+        self.stmt = insert(self.table_meta).values(**kwargs)
+        if self.unique_names:
+            self.stmt = self.stmt.on_conflict_do_update(
+                index_elements=self.unique_names,
+                set_=self.no_unique_data(kwargs),
+            )
         return self
 
     def case(self, update_col="", judge_col="", case_items=[]):
@@ -207,6 +212,26 @@ class TableStmt(object):
 
         return case(*conds, else_=getattr(self.table_meta.c, update_col))
 
+    @property
+    def unique_names(self):
+        uni = []
+        for pri in self.table_meta.constraints:
+            uni.extend(
+                col.name for col in pri.columns if col.name not in self.ignore_col
+            )
+        return uni
+
+    def no_unique_data(self, insert_values):
+        return {k: v for k, v in insert_values.items() if k in self.no_unique_names}
+
+    @property
+    def no_unique_names(self):
+        return [i for i in self.names if i not in self.unique_names]
+
+    def update(self, **kwargs):
+        self.stmt = self.table_meta.update().values(**kwargs)
+        return self
+
     def update_case(self, update_col="", judge_col="", case_items=[], **kwargs):
         """
         Update the value of a column based on a case expression.
@@ -234,12 +259,25 @@ class TableStmt(object):
         self.stmt = self.stmt.select()
         return self
 
-    def where(self, col, value, op="="):
+    def where(self, if_: [[]] = None, **kwargs):
+        if not if_:
+            if_ = []
+        for k, v in kwargs.items():
+            if_.append([k, v])
         if self.exist_stmt:
-            bool_ = Operators.cmp_operators[op](getattr(self.table_meta.c, col), value)
-            if value is not None and Operators.cmp_operators[op] == operator.ne:
-                bool_ = or_(bool_, getattr(self.table_meta.c, col) == None)
-            self.stmt = self.stmt.where(bool_)
+            and_stmt = []
+            for line in if_:
+                op = "==" if len(line) == 2 else line[1]
+                sub_stmt = Operators.cmp_operators[op](
+                    getattr(self.table_meta.c, line[0]), line[-1]
+                )
+                if Operators.cmp_operators[op] in [operator.ne]:
+                    and_stmt.append(
+                        or_(sub_stmt, getattr(self.table_meta.c, line[0]) == None)
+                    )
+                else:
+                    and_stmt.append(sub_stmt)
+            self.stmt = self.stmt.where(and_(*and_stmt))
         return self
 
     def limit(self, num: int):
@@ -249,15 +287,6 @@ class TableStmt(object):
     def subquery(self, *col):
         col = [getattr(self.table_meta.c, c) for c in col]
         self.stmt = select(*col)
-        return self
-
-    def where_in_(self, col, stmt):
-        col = getattr(self.table_meta.c, col)
-        self.stmt = self.stmt.where(col.in_(stmt))
-        return self
-
-    def in_(self, stmt: int):
-        self.stmt = self.stmt._in(stmt)
         return self
 
     def execute(self, session):
@@ -287,6 +316,10 @@ class TableStmt(object):
             for col in self.table_meta.columns
             if col.name not in self.ignore_col
         ]
+
+    @property
+    def no_dup_names(self):
+        return []
 
     @property
     def no_filter_names(self):
@@ -350,3 +383,7 @@ class QQGulidStmt(TableStmt):
     def insert(self, record):
         kwargs = {col: Reflect(col, record).col_value for col in self.names}
         return super().insert(**kwargs)
+
+    def update(self, record):
+        kwargs = {col: Reflect(col, record).col_value for col in self.names}
+        return super().update_case(**kwargs)

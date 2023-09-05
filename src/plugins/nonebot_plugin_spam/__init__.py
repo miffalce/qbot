@@ -43,11 +43,11 @@ async def store_handler(event: Event) -> None:
 async def update_score() -> None:
     for name, table_meta in T.metadata.tables.items():
         if name.startswith("message_tb"):
-            QQGulidStmt(table_meta).delete().where("content", None).execute(T.session)
+            QQGulidStmt(table_meta).delete().where(content=None).execute(T.session)
             data = (
                 QQGulidStmt(table_meta)
                 .select()
-                .where("spam", None)
+                .where(spam=None)
                 .limit(5)
                 .execute(T.session)
                 .fetchall()
@@ -70,15 +70,19 @@ async def recall_message() -> None:
             sub_query_stmt = (
                 QQGulidStmt(user_meta)
                 .subquery("author_id")
-                .where("member_roles", [4, 19], op="!=")
+                .where(member_roles=[4, 19])
                 .stmt
             )
             data = (
                 QQGulidStmt(table_meta)
                 .select()
-                .where_in_("author_id", sub_query_stmt)
-                .where("color", 1, "!=")
-                .where("spam", 0, "<")
+                .where(
+                    [
+                        ["author_id", "in", sub_query_stmt],
+                        ["color", "!=", 1],
+                        ["spam", "<", 0],
+                    ]
+                )
                 .execute(T.session)
                 .fetchall()
                 .filter_by(["channel_id", "id"])
@@ -91,5 +95,5 @@ async def recall_message() -> None:
                     print(f"ERROR: {err}")
                 finally:
                     QQGulidStmt(table_meta).update_case(color=1).where(
-                        "id", ent[1]
+                        id=ent[1]
                     ).execute(T.session)

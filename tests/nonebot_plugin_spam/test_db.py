@@ -51,13 +51,32 @@ class TestTableStmt:
             "user_tb_test", T.model.metadata, T.model.engine
         ).insert(box.Box(T.record)).execute(T.model.session)
         spam_db.QQGulidStmt().create(
-            f"message_tb_test", T.model.metadata, T.model.engine
+            "message_tb_test", T.model.metadata, T.model.engine
         ).insert(box.Box(T.record)).execute(T.model.session)
 
-    def test_select_where_message(func):
+    def test_select_where_list_message(func):
         meta = T.model.metadata.tables["message_tb_test"]
-        dq = spam_db.QQGulidStmt(meta).select().where("spam", None)
-        dq.execute(T.model.session).fetchall().filter_by(["content"])
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .where([["spam", None]])
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["content"])
+        )
+        assert data == ["asdgklasdgklsadg"]
+
+    def test_select_where_kwargs_message(func):
+        meta = T.model.metadata.tables["message_tb_test"]
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .where(spam=None)
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["content"])
+        )
+        assert data == ["asdgklasdgklsadg"]
 
     def test_update_case_message_3_para(func):
         meta = T.model.metadata.tables["message_tb_test"]
@@ -85,14 +104,18 @@ class TestTableStmt:
         sub_query_stmt = (
             spam_db.QQGulidStmt(user_meta)
             .subquery("author_id")
-            .where("member_roles", [4, 18], op="==")
+            .where(member_roles=[4, 18])
             .stmt
         )
         data = (
             spam_db.QQGulidStmt(meta)
             .select()
-            .where_in_("author_id", sub_query_stmt)
-            .where("color", 1, "!=")
+            .where(
+                [
+                    ["author_id", "in", sub_query_stmt],
+                    ["color", "!=", 1],
+                ]
+            )
             .execute(T.model.session)
             .fetchall()
             .filter_by(["channel_id", "id", "color"])
@@ -100,6 +123,20 @@ class TestTableStmt:
         assert data == [
             ["111111111", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", None]
         ]
+
+    def test_unqiue(self):
+        T.record["content"] = "ppp"
+        meta = T.model.metadata.tables["message_tb_test"]
+        spam_db.QQGulidStmt(meta).insert(box.Box(T.record)).execute(T.model.session)
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["content"])
+        )
+
+        assert data == ["ppp"]
 
     def test_clean_db(self):
         meta = T.model.metadata.tables["user_tb_test"]
