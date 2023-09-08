@@ -20,11 +20,17 @@ from sqlalchemy import (
     select,
     insert,
     UniqueConstraint,
+    JSON,
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 
 from sqlalchemy.dialects.postgresql import insert
+from pydantic import BaseModel
+
+
+class GuildConfig(BaseModel):
+    max_spam_limit: float
 
 
 class Operators(object):
@@ -74,6 +80,13 @@ class MeteTypeDef(object):
             Column("spam", FLOAT),
             Column("color", Integer),
             UniqueConstraint("id", "channel_id"),
+        ]
+        self.guild_config: list = [
+            Column("mid", Integer, primary_key=True),
+            Column("guild_id", String, index=True),
+            Column("value", JSON),
+            Column("updated_at", TIMESTAMP),
+            UniqueConstraint("guild_id"),
         ]
 
     @property

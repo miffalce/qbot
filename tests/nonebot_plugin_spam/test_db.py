@@ -155,3 +155,57 @@ class TestTableStmt:
         spam_db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
         meta = T.model.metadata.tables["message_tb_test"]
         spam_db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
+
+
+class TestGobalConfig:
+    def test_global_insert(self):
+        spam_db.QQGulidStmt().create(
+            "guild_config_test", T.model.metadata, T.model.engine
+        ).insert(
+            box.Box(
+                value={"max_spam_value": 0.3, "ppp": "998", "xx": ["tttt"]},
+                guild_id="10000000",
+            )
+        ).execute(
+            T.model.session
+        )
+
+    def test_guild_insert(self):
+        spam_db.QQGulidStmt().create(
+            "guild_config_test", T.model.metadata, T.model.engine
+        ).insert(
+            box.Box(
+                value={"max_spam_value": 0.4, "xx": ["tttt"]},
+                guild_id=T.record["guild_id"],
+            )
+        ).execute(
+            T.model.session
+        )
+
+    def test_2th_guild_insert(self):
+        spam_db.QQGulidStmt().create(
+            "guild_config_test", T.model.metadata, T.model.engine
+        ).insert(
+            box.Box(
+                value={"max_spam_value": 0.3},
+                guild_id=T.record["guild_id"],
+            )
+        ).execute(
+            T.model.session
+        )
+
+    def test_select(self):
+        meta = T.model.metadata.tables["guild_config_test"]
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .where(["guild_id", "in", ["10000000", str(T.record["guild_id"])]])
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["value"])
+        )
+        print(data)
+
+    def test_clean(self):
+        meta = T.model.metadata.tables["guild_config_test"]
+        spam_db.QQGulidStmt(meta).drop(T.model.engine).execute(T.model.session)
