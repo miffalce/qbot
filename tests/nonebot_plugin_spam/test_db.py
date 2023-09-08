@@ -54,12 +54,24 @@ class TestTableStmt:
             "message_tb_test", T.model.metadata, T.model.engine
         ).insert(box.Box(T.record)).execute(T.model.session)
 
-    def test_select_where_list_message(func):
+    def test_select_where_double_list_message(func):
         meta = T.model.metadata.tables["message_tb_test"]
         data = (
             spam_db.QQGulidStmt(meta)
             .select()
             .where([["spam", None]])
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["content"])
+        )
+        assert data == ["asdgklasdgklsadg"]
+
+    def test_select_where_one_list_message(func):
+        meta = T.model.metadata.tables["message_tb_test"]
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .where(["spam", None])
             .execute(T.model.session)
             .fetchall()
             .filter_by(["content"])

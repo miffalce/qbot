@@ -68,7 +68,7 @@ class MeteTypeDef(object):
             Column("mid", Integer, primary_key=True),
             Column("id", String, index=True),
             Column("channel_id", String, index=True),
-            Column("author_id", String, index=True),
+            Column("author_id", String),
             Column("content", String),
             Column("timestamp", TIMESTAMP),
             Column("spam", FLOAT),
@@ -262,6 +262,10 @@ class TableStmt(object):
     def where(self, if_: [[]] = None, **kwargs):
         if not if_:
             if_ = []
+
+        if if_ and not isinstance(if_[0], list):
+            if_ = [if_]
+
         for k, v in kwargs.items():
             if_.append([k, v])
         if self.exist_stmt:

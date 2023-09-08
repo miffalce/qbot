@@ -70,7 +70,7 @@ async def recall_message() -> None:
             sub_query_stmt = (
                 QQGulidStmt(user_meta)
                 .subquery("author_id")
-                .where(member_roles=[4, 19])
+                .where(["member_roles", "!=", [4, 19]])
                 .stmt
             )
             data = (
