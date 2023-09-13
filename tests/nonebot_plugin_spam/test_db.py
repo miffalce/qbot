@@ -204,7 +204,10 @@ class TestGobalConfig:
             .fetchall()
             .filter_by(["value"])
         )
-        print(data)
+        assert data == [
+            {"xx": ["tttt"], "ppp": "998", "max_spam_value": 0.3},
+            {"xx": ["tttt"], "max_spam_value": 0.3},
+        ]
 
     def test_clean(self):
         meta = T.model.metadata.tables["guild_config_test"]

@@ -2,6 +2,8 @@
 
 import datetime
 import operator
+from sqlalchemy import func
+from psycopg2.extras import Json
 
 from sqlalchemy import (
     ARRAY,
@@ -20,12 +22,12 @@ from sqlalchemy import (
     select,
     insert,
     UniqueConstraint,
-    JSON,
+    text,
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import insert, JSONB
 from pydantic import BaseModel
 
 
@@ -84,7 +86,7 @@ class MeteTypeDef(object):
         self.guild_config: list = [
             Column("mid", Integer, primary_key=True),
             Column("guild_id", String, index=True),
-            Column("value", JSON),
+            Column("value", JSONB),
             Column("updated_at", TIMESTAMP),
             UniqueConstraint("guild_id"),
         ]
@@ -129,6 +131,21 @@ class TableModel(object):
         self.metadata = MetaData()
         self.metadata.reflect(self.engine)
         self.session = sessionmaker(bind=self.engine)()
+        self.crate_funcions()
+
+    def crate_funcions(self):
+        jsonb_merge = text(
+            r"""CREATE OR REPLACE FUNCTION jsonb_merge(
+    json1 jsonb,
+    json2 jsonb
+) RETURNS jsonb AS $$
+BEGIN
+    RETURN json1 || json2; END;
+$$ LANGUAGE plpgsql;
+"""
+        )
+        self.session.execute(jsonb_merge)
+        self.session.commit()
 
 
 class TableStmt(object):
@@ -191,10 +208,17 @@ class TableStmt(object):
         }
         self.stmt = insert(self.table_meta).values(**kwargs)
         if self.unique_names:
+            data = {
+                k: func.jsonb_merge(self.table_meta.c.value, Json(v))
+                if isinstance(v, dict)
+                else v
+                for k, v in self.no_unique_data(kwargs).items()
+            }
             self.stmt = self.stmt.on_conflict_do_update(
                 index_elements=self.unique_names,
-                set_=self.no_unique_data(kwargs),
+                set_=data,
             )
+
         return self
 
     def case(self, update_col="", judge_col="", case_items=[]):
