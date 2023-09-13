@@ -2,8 +2,9 @@
 
 import datetime
 import operator
-from sqlalchemy import func
+
 from psycopg2.extras import Json
+from pydantic import BaseModel, validator, confloat, Field
 
 from sqlalchemy import (
     ARRAY,
@@ -15,24 +16,30 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    UniqueConstraint,
+    and_,
     case,
     create_engine,
-    or_,
-    and_,
-    select,
+    func,
     insert,
-    UniqueConstraint,
+    or_,
+    select,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import IntegrityError
 
-from sqlalchemy.dialects.postgresql import insert, JSONB
-from pydantic import BaseModel
+import time
 
 
 class GuildConfig(BaseModel):
-    max_spam_limit: float
+    max_spam_limit: confloat(lt=1) = 0
+
+
+class DefaultGuildConfig(BaseModel):
+    guild_id: str = "10000000"
+    value: dict = Field(default=GuildConfig)
+    updated_at = time.time()
 
 
 class Operators(object):
@@ -135,7 +142,7 @@ class TableModel(object):
 
     def crate_funcions(self):
         jsonb_merge = text(
-            r"""CREATE OR REPLACE FUNCTION jsonb_merge(
+            r"""CREATE OR REPLACE FUNCTION guild_jsonb_merge(
     json1 jsonb,
     json2 jsonb
 ) RETURNS jsonb AS $$
@@ -191,6 +198,15 @@ class TableStmt(object):
         self.stmt = self.table_meta.delete()
         return self
 
+    def order_by(self, col, value=None):
+        col = getattr(self.table_meta.c, col)
+        if value and isinstance(value, list):
+            order_stmt = func.array_positions(value, col)
+            self.stmt = self.stmt.order_by(order_stmt)
+        else:
+            self.stmt = self.stmt.order_by(col)
+        return self
+
     def insert(self, **kwargs):
         """
         Create an insert statement.
@@ -209,7 +225,7 @@ class TableStmt(object):
         self.stmt = insert(self.table_meta).values(**kwargs)
         if self.unique_names:
             data = {
-                k: func.jsonb_merge(self.table_meta.c.value, Json(v))
+                k: func.guild_jsonb_merge(self.table_meta.c.value, Json(v))
                 if isinstance(v, dict)
                 else v
                 for k, v in self.no_unique_data(kwargs).items()
@@ -420,6 +436,15 @@ class QQGulidStmt(TableStmt):
     @property
     def ignore_col(self):
         return ["mid"]
+
+    @property
+    def reflect():
+        return Reflect
+
+    def create(self, *args, **kwargs):
+        meta = super().create(*args, **kwargs)
+        # if meta.table_meta.table_name.startswith("guild_config"):
+        return meta
 
     def insert(self, record):
         kwargs = {col: Reflect(col, record).col_value for col in self.names}

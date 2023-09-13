@@ -3,6 +3,7 @@ import datetime
 import box
 import os
 import spam_db as spam_db
+from collections import ChainMap
 
 
 class T:
@@ -175,7 +176,7 @@ class TestGobalConfig:
             "guild_config_test", T.model.metadata, T.model.engine
         ).insert(
             box.Box(
-                value={"max_spam_value": 0.4, "xx": ["tttt"]},
+                value={"max_spam_value": 0.3, "xx": ["tttt"]},
                 guild_id=T.record["guild_id"],
             )
         ).execute(
@@ -187,7 +188,7 @@ class TestGobalConfig:
             "guild_config_test", T.model.metadata, T.model.engine
         ).insert(
             box.Box(
-                value={"max_spam_value": 0.3},
+                value={"max_spam_value": 0.4},
                 guild_id=T.record["guild_id"],
             )
         ).execute(
@@ -206,8 +207,43 @@ class TestGobalConfig:
         )
         assert data == [
             {"xx": ["tttt"], "ppp": "998", "max_spam_value": 0.3},
-            {"xx": ["tttt"], "max_spam_value": 0.3},
+            {"xx": ["tttt"], "max_spam_value": 0.4},
         ]
+
+    def test_select_reverse(self):
+        meta = T.model.metadata.tables["guild_config_test"]
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .where(["guild_id", "in", ["10000000", str(T.record["guild_id"])]])
+            .order_by("guild_id", [str(T.record["guild_id"]), "10000000"])
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["value"])
+        )
+        assert data == [
+            {"xx": ["tttt"], "max_spam_value": 0.4},
+            {"xx": ["tttt"], "ppp": "998", "max_spam_value": 0.3},
+        ]
+
+    def test_get_value(self):
+        meta = T.model.metadata.tables["guild_config_test"]
+        data = (
+            spam_db.QQGulidStmt(meta)
+            .select()
+            .where(["guild_id", "in", ["10000000", str(T.record["guild_id"])]])
+            .order_by(
+                "guild_id",
+                [
+                    "10000000",
+                    str(T.record["guild_id"]),
+                ],
+            )
+            .execute(T.model.session)
+            .fetchall()
+            .filter_by(["value"])
+        )
+        assert dict(ChainMap(*data)).get("max_spam_value") == 0.3
 
     def test_clean(self):
         meta = T.model.metadata.tables["guild_config_test"]
